@@ -1,0 +1,263 @@
+---
+title: "penguin_assessment.r"
+output: html_document
+---
+
+# Question 4
+
+### *Loading the data and relevant packages*
+```{r}
+
+setwd("/Users/thihoanguyen/Desktop/year 3/computing/MT/PenguinProject/")
+getwd()
+library(palmerpenguins)
+library(ggplot2)
+library(dplyr)
+library(janitor)
+library(tidyverse)
+library(ragg)
+
+```
+
+
+### *Cleaning the data*
+```{r}
+
+#Reading in the raw data
+penguins_raw <- read.csv("data_raw/penguins_raw.csv")
+
+# Defining the cleaning function
+cleaning <- function(data_raw){
+  data_raw %>%
+    clean_names() %>%
+    remove_empty(c("rows", "cols")) %>%
+    select(-starts_with("delta")) %>%
+    select(-starts_with("x")) %>%
+    select(-comments)
+}
+
+#Making another function to subset the data and remove empty rows in body mass
+remove_empty_body_mass <- function(data_clean){
+  data_clean %>%
+    filter(!is.na(body_mass_g)) %>%
+    select(species, body_mass_g, culmen_length_mm)
+}
+
+#Making another function to subset the data and remove empty rows in culmen length
+remove_empty_culmen_length <- function(data_clean){
+  data_clean %>%
+    filter(!is.na(culmen_length_mm)) %>%
+    select(species, body_mass_g, culmen_length_mm)
+}
+
+# Creating a new function and saving it to the cleaning file
+cleaning_new <-function(data_raw){
+  data_raw %>%
+    cleaning() %>%
+    remove_empty_body_mass() %>%
+    remove_empty_culmen_length()
+}
+
+# Calling on the function
+penguins_clean <- cleaning_new(penguins_raw)
+
+# Checking the results
+names(penguins_clean)
+
+# Saving the clean data as penguins_clean.csv in a new folder called data_clean 
+write.csv(penguins_clean, "data_clean/penguins_clean.csv")
+
+```
+
+### *Running a statistical test and plotting the data*
+
+Linear regression model between culmen length and body mass
+
+
+##### Plotting a scatterplot
+```{r}
+ggplot(penguins_clean, 
+       aes(x=body_mass_g, 
+           y=culmen_length_mm)) +
+  geom_point(size=3, alpha=0.8) +
+  theme_bw() +
+  labs(title="Body Mass vs Culmen Length", 
+       subtitle = "Culmen length and body mass of penguins",
+       x="Body mass (g)",
+       y = "Culmen length (mm)")
+```
+
+##### Fitting a regression line onto the plot
+
+```{r}
+ggplot(penguins_clean, 
+       aes(x=body_mass_g, 
+           y=culmen_length_mm)) +
+  geom_point(size=3, alpha=0.8) +
+  theme_bw() +
+  labs(title="Body Mass vs Culmen Length", 
+       subtitle = "Culmen length and body mass of penguins",
+       x="Body mass (g)",
+       y = "Culmen length (mm)")+
+  geom_smooth(method="lm")
+
+```
+
+
+##### Regression model analysis
+```{r}
+#creating a regression model
+penguins_mod <- lm(culmen_length_mm~body_mass_g, penguins_clean)
+#penguins_mod_quad <-lm(culmen_length_mm~body_mass_g+ I(body_mass_g^2), penguins_clean)
+
+summary(penguins_mod)
+
+anova(penguins_mod)
+```
+From the summary output, we can work out that the equation of the regression line is y = (4.05 x 10^-3)x + (2.69 x 10^1). Because our p-value is less than 0.5, it suggests that we can use body mass to predict culmen length. But from the multiple R-squared value, we can see that the linear model only explains 35% of the variation in the data. To investigate this further, I will check if the data violates any assumptions of linear regression.  
+
+##### Checking assumptions
+
+###### ... for normal distribution
+```{r}
+#using QQ plot
+plot(penguins_mod, which=2)
+
+#using a histogram
+ggplot(penguins_clean, aes(x=log(body_mass_g))) + geom_histogram()
+ggplot(penguins_clean, aes(x=culmen_length_mm)) + geom_histogram()
+```
+From the plot you can see that the data is roughly normally distributed.
+
+###### ... for equal variance
+```{r}
+plot(penguins_mod, which=1)
+```
+
+We can see that the data is not equally variable because there seems to be a decrease in vairance of the residuals from left to right. 
+
+Even though the data doesn't match assumptions of linear regression perfectly, it is still better than the quadratic nad other polynomial models, so we can still map a linear model onto it to test for causality.
+
+##### Simpson's paradox - looking at individual species
+An alternative reason for the low R-squared value is Simpson's paradox. This is a phenomenon in which a trend a trend appearing in several groups of data disappears when the groups are pooled. To test this, i will split up the data according to species and individually test for linear regression. 
+
+
+###### Plotting a scatterplot highlighting species
+```{r}
+ggplot(penguins_clean, 
+       aes(x=body_mass_g, 
+           y=culmen_length_mm, 
+           colour = species, 
+           shape = species)) +
+  geom_point(size=3, alpha=0.8) +
+  theme_bw() + 
+  scale_colour_manual(values=c("darkorange", "purple", "cyan4")) +
+  labs(title="Body Mass vs Culmen Length", 
+       subtitle = "Culmen length and body mass for Adelie, Chinstrap and Gentoo penguins",
+       x="Body mass (g)",
+       y = "Culmen length (mm)",
+       colour="Penguin species",
+       shape = "Penguin species") + 
+  geom_smooth(method="lm", se=FALSE)
+```
+
+From this we can see that Chinstrap penhuins don't fit the general linear trend of the pooled dataset. 
+
+###### Linear regression model analysis on Chinstrap penguins
+
+```{r}
+chinstrap <- filter(penguins_clean, species=="Chinstrap penguin (Pygoscelis antarctica)")
+chinstrap
+
+chinstrap_mod <- lm(culmen_length_mm ~ body_mass_g, chinstrap)
+summary(chinstrap_mod)
+anova(chinstrap_mod)
+```
+R-squared for this regression line is 0.26, and the p-value is less than 0.05. So, for chinstraps we can use body mass to predict culmen length. 
+
+###### Linear regression model analysis on Gentoo penguins
+```{r}
+gentoo <- filter(penguins_clean, species=="Gentoo penguin (Pygoscelis papua)")
+gentoo
+
+gentoo_mod <- lm(culmen_length_mm ~ body_mass_g, gentoo)
+summary(gentoo_mod)
+anova(gentoo_mod)
+```
+R-squared for this regression line is 0.45, and the p-value is less than 0.05. So, for gentoos we can use body mass to predict culmen length. 
+
+###### Linear regression model analysis on Adelie penguins 
+```{r}
+adelie <- filter(penguins_clean, species=="Adelie Penguin (Pygoscelis adeliae)")
+adelie
+
+adelie_mod <- lm(culmen_length_mm ~ body_mass_g, adelie)
+summary(adelie_mod)
+anova(adelie_mod)
+```
+R-squared for this regression line is 0.3, and the p-value is less than 0.05. So, for adelies we can use body mass to predict culmen length. 
+
+###### Putting it altogether without Chinstraps
+```{r}
+#binding adelie and gentoo dataframes
+penguins_AG <- rbind(adelie, gentoo)
+
+#plotting a regression line through the penguin_AG data
+penguins_AG_plot <- ggplot(penguins_AG, 
+    aes(x=body_mass_g, 
+           y=culmen_length_mm)) +
+  geom_point(size=3, alpha=0.8) +
+  theme_bw() +
+  labs(title="Body Mass vs Culmen Length", 
+       subtitle = "Culmen length and body mass for Adelie and Gentoo penguins",
+       x="Body mass (g)",
+       y = "Culmen length (mm)")+
+  geom_smooth(method="lm")
+
+penguins_AG_plot
+#fitting a linear regression model to this
+penguins_AG_mod <- lm(culmen_length_mm ~ body_mass_g, penguins_AG)
+summary(penguins_AG_mod)
+anova(penguins_AG_mod)
+```
+Now, without the Chinstrap data, we can see that the linear model accounts for 77% of the variation in the data (instead of 35% with Chinstraps), and the p-value is also below 0.05. This indicates that we can use body mass to predict culmen length. 
+
+### *Saving the figure*
+Firstly, I made functions to plot the figure and then to save the plot as a .png
+
+```{r}
+## Function to plot the body mass and culmen length data
+plot_M_vs_CL_figure <- function(penguins_AG){
+  penguins_AG %>%
+    ggplot(aes(x=body_mass_g, 
+           y=culmen_length_mm)) +
+  geom_point(size=3, alpha=0.8) +
+  theme_bw() +
+  labs(title="Body Mass vs Culmen Length", 
+       subtitle = "Culmen length and body mass for Adelie and Gentoo penguins",
+       x="Body mass (g)",
+       y = "Culmen length (mm)")+
+  geom_smooth(method="lm")
+}
+
+penguins_AG_plot<- plot_M_vs_CL_figure(penguins_AG)
+penguins_AG_plot
+
+## Function to save the plot as .png
+save_LM_plot_png <- function(penguins_AG, filename, size, res, scaling){
+  agg_png(filename, width = size, 
+                    height = size, 
+                    units = "cm", 
+                    res = res, 
+                    scaling = scaling)
+  penguins_AG_plot <- plot_M_vs_CL_figure(penguins_AG)
+  print(penguins_AG_plot)
+  dev.off()
+}
+
+# Call the function that will save it as a .png
+save_LM_plot_png(penguins_AG, "figures/penguins_AG_plot.png", 
+                      size = 15, res = 600, scaling = 1)
+
+```
+
