@@ -9,7 +9,7 @@ cleaning <- function(data_raw){
 }
 
 
-#creating another function to subset the flipper data and remove missing data
+#creating another function to subset the flipepr data and remove missing data
 remove_empty_flipper_length <- function(data_clean){
   data_clean %>%
     filter(!is.na(flipper_length_mm)) %>%
@@ -39,6 +39,3 @@ cleaning_new <-function(data_raw){
     remove_empty_body_mass() %>%
     remove_empty_culmen_length()
 }
-
-
-
