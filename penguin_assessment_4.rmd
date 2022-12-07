@@ -1,0 +1,182 @@
+---
+title: "penguin_assessment.r"
+output: html_document
+---
+
+
+# Question 4
+
+**Loading the data and relevant packages**
+---
+```{r,echo=TRUE, results='hide', message=FALSE}
+#Remember to set your working directory using setwd() and check using getwd()
+setwd("~/Desktop/year 3/computing/MT/PenguinProject")
+#Load the packages from libraries.R file
+source("functions/libraries.R")
+
+```
+
+
+**Cleaning the data**
+---
+```{r}
+
+#Reading in the raw data
+penguins_raw <- read.csv("data_raw/penguins_raw.csv")
+
+# Reading in the functions from cleaning. R file
+source("functions/cleaning.R")
+
+# Calling on the cleaning_new() function
+penguins_clean <- cleaning_new(penguins_raw)
+
+# Checking the heading names
+names(penguins_clean)
+
+# Saving the clean data as penguins_clean.csv in a new folder called data_clean 
+write.csv(penguins_clean, "data_clean/penguins_clean.csv")
+
+```
+
+Here, I will also filter the cleaned data by species for analysis later
+```{r}
+##filtering the dataset for chinstraps only
+chinstrap <- filter(penguins_clean, species=="Chinstrap penguin (Pygoscelis antarctica)")
+##Filtering the dataset for gentoos only
+gentoo <- filter(penguins_clean, species=="Gentoo penguin (Pygoscelis papua)")
+##filtering the dataset for adelie only
+adelie <- filter(penguins_clean, species=="Adelie Penguin (Pygoscelis adeliae)")
+## Filtering the dataset for only adelie and gentoos
+#binding adelie and gentoo dataframes
+penguins_AG <- rbind(adelie, gentoo)
+```
+
+**Checking assumptions for a linear regression analysis**
+---
+
+I will conduct a linear regression analysis between culmen length and body mass. First I will check if the data meets the assumptions:
+
+* Independence of observations
+* Linearity
+* Normality
+* Homogeneity of variance
+
+Independence of observations is met because the observations are taken from different individuals. 
+
+Checking if the data is linearly correlated by plotting a scatterplot:
+```{r}
+
+source("functions/plotting.R")
+ggplot(penguins_clean, 
+       aes(x=body_mass_g, 
+           y=culmen_length_mm)) +
+  geom_point(size=3, alpha=0.8) +
+  theme_bw() +
+  labs(title="Body Mass vs Culmen Length", 
+       subtitle = "Culmen length and body mass of penguins",
+       x="Body mass (g)",
+       y = "Culmen length (mm)")+
+  geom_smooth(method="lm")
+```
+We can see that there is a rough linear positive relationship between body mass and culmen length. 
+
+
+Checking if the data is normally distributed using histograms:
+```{r}
+ # Plot histograms:
+hist(penguins_clean$body_mass_g)
+hist(penguins_clean$culmen_length_mm)
+
+```
+Body mass appears skewed to the right slightly, so let's apply a log transformation. The culmen_length appears bimodal so let's also apply a log transformation to that. 
+
+```{r}
+ # Plot histograms:
+hist(log(penguins_clean$body_mass_g))
+hist(log(penguins_clean$culmen_length_mm))
+```
+The histograms now appear slightly more normally distributed. 
+
+Checking for homeogeneity of variance:
+```{r}
+#creating a regression model
+penguins_mod <- lm(culmen_length_mm~body_mass_g, penguins_clean)
+# creating a residuals vs fitted value plot
+plot(penguins_mod, which=1)
+```
+
+We can see that the data is not equally variable for all values of x because there seems to be a slight decrease in variance of the residuals from left to right. Even though the data doesn't match assumptions of linear regression perfectly, it is still better than the quadratic and other polynomial models, so we can still map a linear regression model onto it to test for causality.
+
+**Linear regression analysis**
+---
+
+```{r}
+# regression analysis
+summary(penguins_mod)
+
+```
+
+From the summary output, we can work out that the equation of the regression line is y = (4.05 x 10^-3)x + (2.69 x 10^1). Because our p-value is less than 0.5, it suggests that we can use body mass to predict culmen length. But from the adjusted R-squared value, we can see that the linear model only explains 35% of the variation in the data. To investigate this further, I will check if the data violates any assumptions of linear regression.  
+
+
+##### Simpson's paradox - looking at individual species
+
+An alternative reason for the low R-squared value is Simpson's paradox. This is a phenomenon in which a trend appearing in several groups of data disappears when the groups are pooled. To test this, let's look at the data according to species, which i have ran earlier in the code, and individually test for linear regression. 
+
+
+Plotting a scatterplot by species:
+```{r}
+plot_by_species(penguins_clean)
+```
+
+From this we can see that Chinstrap penguins don't fit the general linear trend of the pooled dataset. So now let's perform linear model analyses on each penguin species.
+
+Linear regression model analysis on Chinstrap penguins:
+```{r}
+#creating a regression model 
+chinstrap_mod <- lm(culmen_length_mm ~ body_mass_g, chinstrap)
+#statistical annalsysis
+summary(chinstrap_mod)
+```
+R-squared for this regression line is 0.26, and the p-value is less than 0.05. So, for chinstraps we can use body mass to predict culmen length. 
+
+Linear regression model analysis on Gentoo penguins:
+```{r}
+#creating a regression model
+gentoo_mod <- lm(culmen_length_mm ~ body_mass_g, gentoo)
+#statistical analysis
+summary(gentoo_mod)
+```
+R-squared for this regression line is 0.45, and the p-value is less than 0.05. So, for gentoos we can use body mass to predict culmen length. 
+
+Linear regression model analysis on Adelie penguins:
+```{r}
+#creating a regression model
+adelie_mod <- lm(culmen_length_mm ~ body_mass_g, adelie)
+#statistical analysis
+summary(adelie_mod)
+```
+R-squared for this regression line is 0.3, and the p-value is less than 0.05. So, for adelies we can use body mass to predict culmen length. 
+
+For all species, you can predict culmen length from body mass, but they have different gradients. Adelie and Gentoo have closer gradietns, so let's try pooling the data without Chinstraps:
+```{r}
+penguins_AG_plot<- plot_M_vs_CL_figure(penguins_AG)
+penguins_AG_plot
+#fitting a linear regression model to this
+penguins_AG_mod <- lm(culmen_length_mm ~ body_mass_g, penguins_AG)
+#statistical analysis
+summary(penguins_AG_mod)
+```
+Now, without the Chinstrap data, we can see that the linear model accounts for 77% of the variation in the data (instead of 35% with Chinstraps), and the p-value is also below 0.05. This indicates that when we remove chinstraps from the dataset, the body mass and culmen length follow a closer correlation. 
+
+
+**Saving the figure**
+---
+```{r}
+
+# Call the function that will save it as a .png
+save_LM_plot_png(penguins_AG, "figures/penguins_AG_plot.png", 
+                      size = 15, res = 600, scaling = 1)
+
+```
+
