@@ -33,13 +33,12 @@ save_flipper_plot_svg <- function(penguin_flippers, filename, size, res, scaling
   dev.off()
 }
 
-
-## Function to plot the body mass and culmen length data for Adelie and Gentoo penguins only
-plot_M_vs_CL_figure<- function(penguins_AG){
+## Function to plot the body mass and culmen length data
+plot_M_vs_CL_figure <- function(penguins_AG){
   penguins_AG %>%
     ggplot(aes(x=body_mass_g, 
                y=culmen_length_mm)) +
-    geom_point(size=3, alpha=0.8)+
+    geom_point(size=3, alpha=0.8) +
     theme_bw() +
     labs(title="Body Mass vs Culmen Length", 
          subtitle = "Culmen length and body mass for Adelie and Gentoo penguins",
@@ -47,16 +46,3 @@ plot_M_vs_CL_figure<- function(penguins_AG){
          y = "Culmen length (mm)")+
     geom_smooth(method="lm")
 }
-
-## Function to save the penguins_AG_plot as a .png
-save_LM_plot_png <- function(penguins_AG, filename, size, res, scaling){
-  agg_png(filename, width = size, 
-          height = size, 
-          units = "cm", 
-          res = res, 
-          scaling = scaling)
-  penguins_AG_plot <- plot_M_vs_CL_figure(penguins_AG)
-  print(penguins_AG_plot)
-  dev.off()
-}
-
